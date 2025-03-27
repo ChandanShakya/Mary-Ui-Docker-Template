@@ -1,0 +1,6 @@
+name: KharchaTrack
+description: A resource-optimized Laravel expense tracking application designed for low-end hardware
+private: false
+has_issues: true
+has_projects: true
+has_wiki: true

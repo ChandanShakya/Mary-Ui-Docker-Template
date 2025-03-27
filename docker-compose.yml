@@ -1,0 +1,130 @@
+services:
+  frankenphp:
+    build:
+      context: .
+    container_name: laravel_app
+    restart: unless-stopped
+    entrypoint: php artisan octane:frankenphp --workers=2 --max-requests=250 --port=9000 --host=0.0.0.0
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - CACHE_DRIVER=redis
+      - SESSION_DRIVER=redis
+      - QUEUE_CONNECTION=redis
+      - REDIS_HOST=redis
+      - OPCACHE_SAVE_COMMENTS=0
+    deploy:
+      resources:
+        limits:
+          cpus: '0.8'
+          memory: 600M
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./laravel-project:/app
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - laravel
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "glance.name=KharchaTrack App"
+      - "glance.description=Laravel FrankenPHP Application"
+      - "glance.type=application"
+      - "glance.priority=high"
+      - "glance.group=web"
+
+  postgres:
+    image: postgres:alpine
+    container_name: laravel_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: laravel
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: laravel
+    command: postgres -c shared_buffers=128MB -c work_mem=4MB -c maintenance_work_mem=32MB -c max_connections=20 -c effective_cache_size=256MB -c wal_buffers=4MB -c checkpoint_completion_target=0.9 -c random_page_cost=4.0 -c max_wal_size=128MB
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 250M
+    networks:
+      - laravel
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U laravel"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      - "glance.name=PostgreSQL"
+      - "glance.description=KharchaTrack Database"
+      - "glance.type=database"
+      - "glance.priority=critical"
+      - "glance.group=data"
+
+  redis:
+    image: redis:alpine
+    container_name: laravel_redis
+    restart: unless-stopped
+    command: redis-server --appendonly no --maxmemory 128mb --maxmemory-policy allkeys-lru --save "" --databases 2
+    volumes:
+      - redis_data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 150M
+    networks:
+      - laravel
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      - "glance.name=Redis"
+      - "glance.description=KharchaTrack Cache & Queue"
+      - "glance.type=cache"
+      - "glance.priority=medium"
+      - "glance.group=data"
+
+  composer:
+    image: composer:latest
+    container_name: laravel_composer
+    working_dir: /app
+    volumes:
+      - ./laravel-project:/app
+    entrypoint: ["composer"]
+    profiles:
+      - tools
+    labels:
+      - "glance.name=Composer"
+      - "glance.description=PHP Dependency Manager"
+      - "glance.type=tool"
+      - "glance.priority=low"
+      - "glance.group=utility"
+
+networks:
+  laravel:
+    driver: bridge
+    labels:
+      - "glance.name=KharchaTrack Network"
+      - "glance.description=Internal network for KharchaTrack containers"
+
+volumes:
+  postgres_data:
+    labels:
+      - "glance.name=PostgreSQL Data"
+      - "glance.description=Persistent database storage"
+  redis_data:
+    labels:
+      - "glance.name=Redis Data"
+      - "glance.description=Cache and queue data"
