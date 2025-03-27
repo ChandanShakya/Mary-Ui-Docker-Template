@@ -9,7 +9,8 @@ RUN install-php-extensions \
     apcu \
     redis \
     bcmath \
-    intl
+    intl \
+    xdebug
 
 # Configure PHP for production performance
 RUN echo "opcache.enable=1" >> /usr/local/etc/php/conf.d/opcache.ini && \
@@ -32,6 +33,14 @@ RUN echo "memory_limit=256M" >> /usr/local/etc/php/conf.d/php.ini && \
     echo "upload_max_filesize=10M" >> /usr/local/etc/php/conf.d/php.ini && \
     echo "post_max_size=10M" >> /usr/local/etc/php/conf.d/php.ini && \
     echo "expose_php=Off" >> /usr/local/etc/php/conf.d/php.ini
+
+# Configure Xdebug (disabled by default)
+RUN echo "xdebug.mode=off" >> /usr/local/etc/php/conf.d/xdebug.ini && \
+    echo "xdebug.start_with_request=trigger" >> /usr/local/etc/php/conf.d/xdebug.ini && \
+    echo "xdebug.client_host=host.docker.internal" >> /usr/local/etc/php/conf.d/xdebug.ini && \
+    echo "xdebug.client_port=9003" >> /usr/local/etc/php/conf.d/xdebug.ini && \
+    echo "xdebug.log=/tmp/xdebug.log" >> /usr/local/etc/php/conf.d/xdebug.ini && \
+    echo "xdebug.idekey=VSCODE" >> /usr/local/etc/php/conf.d/xdebug.ini
 
 WORKDIR /app
 

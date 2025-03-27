@@ -51,6 +51,8 @@ services:
     command: postgres -c shared_buffers=128MB -c work_mem=4MB -c maintenance_work_mem=32MB -c max_connections=20 -c effective_cache_size=256MB -c wal_buffers=4MB -c checkpoint_completion_target=0.9 -c random_page_cost=4.0 -c max_wal_size=128MB
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
     deploy:
       resources:
         limits:
@@ -110,6 +112,29 @@ services:
       - "glance.description=PHP Dependency Manager"
       - "glance.type=tool"
       - "glance.priority=low"
+      - "glance.group=utility"
+
+  node:
+    image: node:alpine
+    container_name: laravel_node
+    working_dir: /app
+    volumes:
+      - ./laravel-project:/app
+    entrypoint: ["yarn"]
+    ports:
+      - "5173:5173"
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - HOST=0.0.0.0
+    networks:
+      - laravel
+    profiles:
+      - tools
+    labels:
+      - "glance.name=Node.js"
+      - "glance.description=JavaScript runtime for frontend assets"
+      - "glance.type=tool"
+      - "glance.priority=low" 
       - "glance.group=utility"
 
 networks:

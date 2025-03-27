@@ -10,6 +10,8 @@
         "laravel/framework": "^11.0",
         "laravel/octane": "^2.0",
         "laravel/tinker": "^2.9",
+        "livewire/livewire": "^3.6",
+        "livewire/volt": "^1.7",
         "robsontenorio/mary": "^1.41"
     },
     "require-dev": {

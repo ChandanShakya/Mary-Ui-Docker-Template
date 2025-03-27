@@ -1,37 +1,63 @@
 #!/bin/bash
 
+#===========================================
 # KharchaTrack Project Setup Script
-# Optimized for low-resource environments (Pentium CPU, <3GB RAM)
+# Optimized for low-resource environments
 # Created: March 27, 2025
+# Last updated: March 28, 2025
+#===========================================
 
-set -e  # Exit on error
+# Exit on any error to prevent partial setups
+set -e
 
-# Text formatting
+#===========================================
+# ANSI color codes for prettier output
+#===========================================
 BOLD="\033[1m"
 GREEN="\033[0;32m"
 YELLOW="\033[0;33m"
 RED="\033[0;31m"
+BLUE="\033[0;34m"
 RESET="\033[0m"
 
-echo -e "${BOLD}${GREEN}KharchaTrack Project Setup${RESET}"
+#===========================================
+# Header and introduction
+#===========================================
+echo -e "${BOLD}${BLUE}╔════════════════════════════════════════╗${RESET}"
+echo -e "${BOLD}${BLUE}║         KharchaTrack Setup            ║${RESET}"
+echo -e "${BOLD}${BLUE}╚════════════════════════════════════════╝${RESET}"
 echo -e "${YELLOW}Optimized for low-resource environments${RESET}"
-echo "---------------------------------------------"
+echo -e "${GREEN}▶ Starting setup process...${RESET}\n"
+
+#===========================================
+# Check prerequisites
+#===========================================
+echo -e "${BOLD}[1/7]${RESET} ${YELLOW}Checking prerequisites...${RESET}"
 
 # Check if Docker is installed
 if ! command -v docker &> /dev/null; then
-    echo -e "${RED}Docker is not installed. Please install Docker first.${RESET}"
+    echo -e "${RED}✗ Error: Docker is not installed.${RESET}"
+    echo -e "${YELLOW}▶ Please install Docker first: https://docs.docker.com/get-docker/${RESET}"
     exit 1
 fi
+echo -e "${GREEN}✓ Docker is installed.${RESET}"
 
 # Check if Docker Compose is installed
 if ! command -v docker-compose &> /dev/null; then
-    echo -e "${RED}Docker Compose is not installed. Please install Docker Compose first.${RESET}"
+    echo -e "${RED}✗ Error: Docker Compose is not installed.${RESET}"
+    echo -e "${YELLOW}▶ Please install Docker Compose first: https://docs.docker.com/compose/install/${RESET}"
     exit 1
 fi
+echo -e "${GREEN}✓ Docker Compose is installed.${RESET}"
+
+#===========================================
+# Environment setup
+#===========================================
+echo -e "\n${BOLD}[2/7]${RESET} ${YELLOW}Setting up environment...${RESET}"
 
 # Set up environment file if it doesn't exist
 if [ ! -f ./laravel-project/.env ]; then
-    echo -e "${YELLOW}Setting up environment file...${RESET}"
+    echo -e "${YELLOW}▶ Creating .env file...${RESET}"
     cp ./laravel-project/.env.example ./laravel-project/.env 2>/dev/null || echo "APP_NAME=KharchaTrack
 APP_ENV=production
 APP_KEY=
@@ -94,69 +120,147 @@ VITE_PUSHER_SCHEME="${PUSHER_SCHEME}"
 VITE_PUSHER_APP_CLUSTER="${PUSHER_APP_CLUSTER}"
 
 OCTANE_SERVER=frankenphp" > ./laravel-project/.env
+    echo -e "${GREEN}✓ Environment file created.${RESET}"
+else
+    echo -e "${GREEN}✓ Environment file already exists.${RESET}"
 fi
+
+#===========================================
+# Container preparation
+#===========================================
+echo -e "\n${BOLD}[3/7]${RESET} ${YELLOW}Preparing containers...${RESET}"
 
 # Clean up previous containers and volumes if requested
 if [ "$1" = "--clean" ]; then
-    echo -e "${YELLOW}Cleaning up previous containers and volumes...${RESET}"
+    echo -e "${YELLOW}▶ Cleaning up previous containers and volumes...${RESET}"
     docker-compose down -v
+    echo -e "${GREEN}✓ Previous setup cleaned.${RESET}"
+else
+    echo -e "${YELLOW}▶ Using existing setup (use --clean to start fresh).${RESET}"
 fi
 
 # Build and start containers
-echo -e "${YELLOW}Building and starting Docker containers...${RESET}"
+echo -e "${YELLOW}▶ Building Docker containers...${RESET}"
 docker-compose build
+
+echo -e "${YELLOW}▶ Starting Docker containers...${RESET}"
 docker-compose up -d
 
 # Wait for database and Redis to be ready
-echo -e "${YELLOW}Waiting for services to be ready...${RESET}"
+echo -e "${YELLOW}▶ Waiting for services to initialize (10s)...${RESET}"
 sleep 10
+echo -e "${GREEN}✓ Services ready.${RESET}"
+
+#===========================================
+# Laravel initialization
+#===========================================
+echo -e "\n${BOLD}[4/7]${RESET} ${YELLOW}Initializing Laravel application...${RESET}"
 
 # Generate application key
-echo -e "${YELLOW}Generating application key...${RESET}"
+echo -e "${YELLOW}▶ Generating application key...${RESET}"
 docker-compose exec frankenphp php artisan key:generate --force
+echo -e "${GREEN}✓ Application key generated.${RESET}"
 
 # Run migrations
-echo -e "${YELLOW}Running database migrations...${RESET}"
+echo -e "${YELLOW}▶ Running database migrations...${RESET}"
 docker-compose exec frankenphp php artisan migrate --force
+echo -e "${GREEN}✓ Migrations completed.${RESET}"
 
-# Optimize for production
-echo -e "${YELLOW}Optimizing for production environment...${RESET}"
+#===========================================
+# Performance optimizations
+#===========================================
+echo -e "\n${BOLD}[5/7]${RESET} ${YELLOW}Applying performance optimizations...${RESET}"
+
+echo -e "${YELLOW}▶ Caching configurations...${RESET}"
 docker-compose exec frankenphp php artisan config:cache
 docker-compose exec frankenphp php artisan route:cache
 docker-compose exec frankenphp php artisan view:cache
 docker-compose exec frankenphp php artisan event:cache
-docker-compose exec frankenphp composer install --optimize-autoloader --no-dev
+echo -e "${GREEN}✓ Configuration caching complete.${RESET}"
 
-# Set proper permissions
-echo -e "${YELLOW}Setting proper file permissions...${RESET}"
+echo -e "${YELLOW}▶ Optimizing Composer autoloader...${RESET}"
+docker-compose exec frankenphp composer install --optimize-autoloader --no-dev
+echo -e "${GREEN}✓ Composer optimized.${RESET}"
+
+#===========================================
+# Set file permissions
+#===========================================
+echo -e "\n${BOLD}[6/7]${RESET} ${YELLOW}Setting file permissions...${RESET}"
 docker-compose exec frankenphp chmod -R 775 storage bootstrap/cache
 docker-compose exec frankenphp chown -R www-data:www-data storage bootstrap/cache
+echo -e "${GREEN}✓ File permissions set.${RESET}"
+
+#===========================================
+# Frontend assets
+#===========================================
+echo -e "\n${BOLD}[7/7]${RESET} ${YELLOW}Setting up frontend assets...${RESET}"
 
 # Install NPM dependencies and build frontend assets (if needed)
-if [ -f ./laravel-project/package.json ] && [ "$1" != "--skip-npm" ]; then
-    echo -e "${YELLOW}Building frontend assets...${RESET}"
-    docker-compose run --rm -w /app node npm ci
-    docker-compose run --rm -w /app node npm run build
+if [ -f ./laravel-project/package.json ]; then
+    # Production build or development mode
+    if [ "$1" != "--skip-npm" ]; then
+        echo -e "${YELLOW}▶ Installing frontend dependencies...${RESET}"
+        docker-compose run --rm node install
+        echo -e "${GREEN}✓ Dependencies installed.${RESET}"
+        
+        echo -e "${YELLOW}▶ Building frontend assets for production...${RESET}"
+        docker-compose run --rm node build
+        echo -e "${GREEN}✓ Frontend assets built.${RESET}"
+    else
+        echo -e "${YELLOW}▶ Skipping frontend build (--skip-npm flag detected).${RESET}"
+    fi
+    
+    # Start development server if --dev flag is passed
+    if [ "$1" = "--dev" ]; then
+        echo -e "\n${BLUE}▶ Starting Vite development server with Livewire hot reload...${RESET}"
+        docker-compose run --rm -d -p 5173:5173 --entrypoint "yarn dev --host 0.0.0.0" node
+        echo -e "${GREEN}✓ Vite development server started at: http://localhost:5173${RESET}"
+    fi
+else
+    echo -e "${YELLOW}▶ No package.json found. Skipping frontend setup.${RESET}"
 fi
 
-# Check health status
-echo -e "${YELLOW}Checking application health...${RESET}"
-curl -s http://localhost:9000/health.php || echo -e "${RED}Health check failed. Application may not be fully operational.${RESET}"
+#===========================================
+# Health check
+#===========================================
+echo -e "\n${BOLD}[FINAL]${RESET} ${YELLOW}Performing health check...${RESET}"
+health_check=$(curl -s http://localhost:9000/health.php)
 
-# Output information
-echo -e "${GREEN}Setup completed successfully!${RESET}"
-echo -e "${BOLD}Your KharchaTrack application is now running at: http://localhost:9000${RESET}"
-echo
-echo -e "Resource Allocation:"
+if [ -n "$health_check" ]; then
+    echo -e "${GREEN}✓ Health check passed. Application is operational.${RESET}"
+else
+    echo -e "${RED}✗ Health check failed. Application may not be fully operational.${RESET}"
+    echo -e "${YELLOW}▶ Check logs with: docker-compose logs frankenphp${RESET}"
+fi
+
+#===========================================
+# Success message and instructions
+#===========================================
+echo -e "\n${BOLD}${GREEN}╔════════════════════════════════════════╗${RESET}"
+echo -e "${BOLD}${GREEN}║       Setup completed successfully!     ║${RESET}"
+echo -e "${BOLD}${GREEN}╚════════════════════════════════════════╝${RESET}"
+
+echo -e "\n${BOLD}Your KharchaTrack application is now running at:${RESET}"
+echo -e "${BOLD}${BLUE}http://localhost:9000${RESET}"
+
+echo -e "\n${YELLOW}Resource Allocation:${RESET}"
 echo -e "- FrankenPHP: ${BOLD}0.8 CPU / 600MB RAM${RESET}"
-echo -e "- PostgreSQL (latest): ${BOLD}0.5 CPU / 250MB RAM${RESET}"
+echo -e "- PostgreSQL: ${BOLD}0.5 CPU / 250MB RAM${RESET}"
 echo -e "- Redis:      ${BOLD}0.3 CPU / 150MB RAM${RESET}"
-echo
-echo -e "Useful commands:"
+
+echo -e "\n${YELLOW}Quick Management:${RESET}"
+echo -e "- Run ${BOLD}./runner.sh${RESET} for a simple GUI to manage your application."
+
+echo -e "\n${YELLOW}Useful commands:${RESET}"
 echo -e "- ${BOLD}docker-compose down${RESET} to stop all services"
 echo -e "- ${BOLD}docker-compose up -d${RESET} to start all services"
 echo -e "- ${BOLD}docker-compose exec frankenphp php artisan${RESET} to run Laravel commands"
+echo -e "- ${BOLD}docker-compose run --rm node dev${RESET} to start Vite development server"
+
+echo -e "\n${YELLOW}Setup options:${RESET}"
 echo -e "- ${BOLD}./setup.sh --skip-npm${RESET} to skip building frontend assets"
 echo -e "- ${BOLD}./setup.sh --clean${RESET} to clean up and start fresh"
-echo
-echo -e "${YELLOW}Documentation can be found in the docs/ directory.${RESET}"
+echo -e "- ${BOLD}./setup.sh --dev${RESET} to start with development environment"
+
+echo -e "\n${YELLOW}Documentation can be found in the docs/ directory.${RESET}"
+echo -e "${GREEN}Happy coding!${RESET}\n"
