@@ -76,9 +76,11 @@ services:
     image: redis:alpine
     container_name: laravel_redis
     restart: unless-stopped
-    command: redis-server --appendonly no --maxmemory 128mb --maxmemory-policy allkeys-lru --save "" --databases 2
+    command: redis-server --bind 0.0.0.0 --appendonly no --maxmemory 128mb --maxmemory-policy allkeys-lru --save "" --databases 2 --protected-mode no
     volumes:
       - redis_data:/data
+    ports:
+      - "6379:6379"
     deploy:
       resources:
         limits:

@@ -208,6 +208,27 @@ PostgreSQL is accessible from outside Docker for use with database tools:
    ssh -L 5432:localhost:5432 username@your-server
    ```
 
+## Redis Access
+
+Redis is also configured for external connections, allowing you to use tools like DBeaver to monitor and manage your cache:
+
+### Connection Details
+- **Host**: localhost (or your server's IP address)
+- **Port**: 6379
+- **Password**: None (No authentication configured by default)
+
+### Using with DBeaver
+1. Install the Redis extension in DBeaver if not already installed
+2. Create a new Redis connection
+3. Enter the connection details above
+4. For remote connections, you may need to set up SSH tunneling:
+   ```bash
+   ssh -L 6379:localhost:6379 username@your-server
+   ```
+
+### Redis Security Note
+The current configuration allows unauthenticated access to Redis for easier development. For production environments, consider adding password protection by modifying the Redis command in `docker-compose.yml` to include `--requirepass your_secure_password`.
+
 ## Performance Optimizations
 
 This application includes the following performance optimizations for low-resource environments:
