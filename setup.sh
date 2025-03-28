@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #===========================================
-# KharchaTrack Project Setup Script
+# maryDock Project Setup Script
 # Optimized for low-resource environments
 # Created: March 27, 2025
 # Last updated: March 28, 2025
@@ -24,7 +24,7 @@ RESET="\033[0m"
 # Header and introduction
 #===========================================
 echo -e "${BOLD}${BLUE}╔════════════════════════════════════════╗${RESET}"
-echo -e "${BOLD}${BLUE}║         KharchaTrack Setup            ║${RESET}"
+echo -e "${BOLD}${BLUE}║         maryDock Setup               ║${RESET}"
 echo -e "${BOLD}${BLUE}╚════════════════════════════════════════╝${RESET}"
 echo -e "${YELLOW}Optimized for low-resource environments${RESET}"
 echo -e "${GREEN}▶ Starting setup process...${RESET}\n"
@@ -35,18 +35,18 @@ echo -e "${GREEN}▶ Starting setup process...${RESET}\n"
 echo -e "${BOLD}[1/7]${RESET} ${YELLOW}Checking prerequisites...${RESET}"
 
 # Check if Docker is installed
-if ! command -v docker &> /dev/null; then
-    echo -e "${RED}✗ Error: Docker is not installed.${RESET}"
-    echo -e "${YELLOW}▶ Please install Docker first: https://docs.docker.com/get-docker/${RESET}"
-    exit 1
+if ! command -v docker &>/dev/null; then
+  echo -e "${RED}✗ Error: Docker is not installed.${RESET}"
+  echo -e "${YELLOW}▶ Please install Docker first: https://docs.docker.com/get-docker/${RESET}"
+  exit 1
 fi
 echo -e "${GREEN}✓ Docker is installed.${RESET}"
 
 # Check if Docker Compose is installed
-if ! command -v docker-compose &> /dev/null; then
-    echo -e "${RED}✗ Error: Docker Compose is not installed.${RESET}"
-    echo -e "${YELLOW}▶ Please install Docker Compose first: https://docs.docker.com/compose/install/${RESET}"
-    exit 1
+if ! command -v docker-compose &>/dev/null; then
+  echo -e "${RED}✗ Error: Docker Compose is not installed.${RESET}"
+  echo -e "${YELLOW}▶ Please install Docker Compose first: https://docs.docker.com/compose/install/${RESET}"
+  exit 1
 fi
 echo -e "${GREEN}✓ Docker Compose is installed.${RESET}"
 
@@ -57,8 +57,8 @@ echo -e "\n${BOLD}[2/7]${RESET} ${YELLOW}Setting up environment...${RESET}"
 
 # Set up environment file if it doesn't exist
 if [ ! -f ./laravel-project/.env ]; then
-    echo -e "${YELLOW}▶ Creating .env file...${RESET}"
-    cp ./laravel-project/.env.example ./laravel-project/.env 2>/dev/null || echo "APP_NAME=KharchaTrack
+  echo -e "${YELLOW}▶ Creating .env file...${RESET}"
+  cp ./laravel-project/.env.example ./laravel-project/.env 2>/dev/null || echo "APP_NAME=maryDock
 APP_ENV=production
 APP_KEY=
 APP_DEBUG=false
@@ -119,24 +119,32 @@ VITE_PUSHER_PORT="${PUSHER_PORT}"
 VITE_PUSHER_SCHEME="${PUSHER_SCHEME}"
 VITE_PUSHER_APP_CLUSTER="${PUSHER_APP_CLUSTER}"
 
-OCTANE_SERVER=frankenphp" > ./laravel-project/.env
-    echo -e "${GREEN}✓ Environment file created.${RESET}"
+OCTANE_SERVER=frankenphp" >./laravel-project/.env
+  echo -e "${GREEN}✓ Environment file created.${RESET}"
 else
-    echo -e "${GREEN}✓ Environment file already exists.${RESET}"
+  echo -e "${GREEN}✓ Environment file already exists.${RESET}"
 fi
 
 #===========================================
 # Container preparation
 #===========================================
 echo -e "\n${BOLD}[3/7]${RESET} ${YELLOW}Preparing containers...${RESET}"
-
 # Clean up previous containers and volumes if requested
 if [ "$1" = "--clean" ]; then
-    echo -e "${YELLOW}▶ Cleaning up previous containers and volumes...${RESET}"
-    docker-compose down -v
-    echo -e "${GREEN}✓ Previous setup cleaned.${RESET}"
+  echo -e "${YELLOW}▶ Cleaning up previous containers and volumes...${RESET}"
+  
+  # Check for and stop any running Node containers first
+  node_containers=$(docker ps -q --filter "name=vite_dev_server" --filter "name=mary-ui-docker-template-node")
+  if [ -n "$node_containers" ]; then
+    echo -e "${YELLOW}▶ Stopping Node.js development server...${RESET}"
+    docker stop $node_containers
+    docker rm $node_containers 2>/dev/null
+  fi
+  
+  docker-compose down -v
+  echo -e "${GREEN}✓ Previous setup cleaned.${RESET}"
 else
-    echo -e "${YELLOW}▶ Using existing setup (use --clean to start fresh).${RESET}"
+  echo -e "${YELLOW}▶ Using existing setup (use --clean to start fresh).${RESET}"
 fi
 
 # Build and start containers
@@ -179,7 +187,7 @@ docker-compose exec frankenphp php artisan event:cache
 echo -e "${GREEN}✓ Configuration caching complete.${RESET}"
 
 echo -e "${YELLOW}▶ Optimizing Composer autoloader...${RESET}"
-docker-compose exec frankenphp composer install --optimize-autoloader --no-dev
+docker-compose run --rm composer install --optimize-autoloader --no-dev
 echo -e "${GREEN}✓ Composer optimized.${RESET}"
 
 #===========================================
@@ -197,27 +205,27 @@ echo -e "\n${BOLD}[7/7]${RESET} ${YELLOW}Setting up frontend assets...${RESET}"
 
 # Install NPM dependencies and build frontend assets (if needed)
 if [ -f ./laravel-project/package.json ]; then
-    # Production build or development mode
-    if [ "$1" != "--skip-npm" ]; then
-        echo -e "${YELLOW}▶ Installing frontend dependencies...${RESET}"
-        docker-compose run --rm node install
-        echo -e "${GREEN}✓ Dependencies installed.${RESET}"
-        
-        echo -e "${YELLOW}▶ Building frontend assets for production...${RESET}"
-        docker-compose run --rm node build
-        echo -e "${GREEN}✓ Frontend assets built.${RESET}"
-    else
-        echo -e "${YELLOW}▶ Skipping frontend build (--skip-npm flag detected).${RESET}"
-    fi
-    
-    # Start development server if --dev flag is passed
-    if [ "$1" = "--dev" ]; then
-        echo -e "\n${BLUE}▶ Starting Vite development server with Livewire hot reload...${RESET}"
-        docker-compose run --rm -d -p 5173:5173 --entrypoint "yarn dev --host 0.0.0.0" node
-        echo -e "${GREEN}✓ Vite development server started at: http://localhost:5173${RESET}"
-    fi
+  # Production build or development mode
+  if [ "$1" != "--skip-npm" ]; then
+    echo -e "${YELLOW}▶ Installing frontend dependencies...${RESET}"
+    docker-compose run --rm node install
+    echo -e "${GREEN}✓ Dependencies installed.${RESET}"
+
+    echo -e "${YELLOW}▶ Building frontend assets for production...${RESET}"
+    docker-compose run --rm node build
+    echo -e "${GREEN}✓ Frontend assets built.${RESET}"
+  else
+    echo -e "${YELLOW}▶ Skipping frontend build (--skip-npm flag detected).${RESET}"
+  fi
+
+  # Start development server if --dev flag is passed
+  if [ "$1" = "--dev" ]; then
+    echo -e "\n${BLUE}▶ Starting Vite development server with Livewire hot reload...${RESET}"
+    docker-compose run --rm -d -p 5173:5173 --name vite_dev_server --entrypoint "yarn dev --host 0.0.0.0" node
+    echo -e "${GREEN}✓ Vite development server started at: http://localhost:5173${RESET}"
+  fi
 else
-    echo -e "${YELLOW}▶ No package.json found. Skipping frontend setup.${RESET}"
+  echo -e "${YELLOW}▶ No package.json found. Skipping frontend setup.${RESET}"
 fi
 
 #===========================================
@@ -227,10 +235,10 @@ echo -e "\n${BOLD}[FINAL]${RESET} ${YELLOW}Performing health check...${RESET}"
 health_check=$(curl -s http://localhost:9000/health.php)
 
 if [ -n "$health_check" ]; then
-    echo -e "${GREEN}✓ Health check passed. Application is operational.${RESET}"
+  echo -e "${GREEN}✓ Health check passed. Application is operational.${RESET}"
 else
-    echo -e "${RED}✗ Health check failed. Application may not be fully operational.${RESET}"
-    echo -e "${YELLOW}▶ Check logs with: docker-compose logs frankenphp${RESET}"
+  echo -e "${RED}✗ Health check failed. Application may not be fully operational.${RESET}"
+  echo -e "${YELLOW}▶ Check logs with: docker-compose logs frankenphp${RESET}"
 fi
 
 #===========================================
@@ -240,7 +248,7 @@ echo -e "\n${BOLD}${GREEN}╔═════════════════
 echo -e "${BOLD}${GREEN}║       Setup completed successfully!     ║${RESET}"
 echo -e "${BOLD}${GREEN}╚════════════════════════════════════════╝${RESET}"
 
-echo -e "\n${BOLD}Your KharchaTrack application is now running at:${RESET}"
+echo -e "\n${BOLD}Your maryDock application is now running at:${RESET}"
 echo -e "${BOLD}${BLUE}http://localhost:9000${RESET}"
 
 echo -e "\n${YELLOW}Resource Allocation:${RESET}"

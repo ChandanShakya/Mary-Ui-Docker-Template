@@ -1,4 +1,4 @@
-# KharchaTrack
+# maryDock
 
 <div align="center">
   <h3>A resource-optimized Laravel expense tracking application</h3>
@@ -142,6 +142,7 @@ The project includes a CLI-based runner.sh script designed to work over SSH conn
 ```
 start                Start all services
 stop                 Stop all services
+stop-node            Stop only the Node.js development server
 restart              Restart all services
 status               Show status of all containers and resources
 logs [service]       View logs for a specific service
@@ -272,8 +273,14 @@ You can access the runner help information with:
 # Start all services
 ./runner.sh start
 
-# Stop all services
+# Stop all services (including any Node development server)
 ./runner.sh stop
+
+# Start Vite development server in the background
+./runner.sh dev-bg
+
+# Stop only the Node.js development server without affecting other services
+./runner.sh stop-node
 
 # Run Laravel commands
 ./runner.sh artisan <command>

@@ -21,7 +21,7 @@ echo json_encode([
     'memory_usage' => $memoryUsage . 'MB',
     'memory_limit' => $maxMemory,
     'load_average' => $loadAvg,
-    'server' => 'KharchaTrack - FrankenPHP'
+    'server' => 'maryDock - FrankenPHP'
 ], JSON_PRETTY_PRINT);
 
 exit(0);

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #===========================================
-# KharchaTrack Server CLI Runner
+# maryDock Server CLI Runner
 # CLI tool for managing the application via SSH
 # Created: March 28, 2025
 # Last updated: March 28, 2025
@@ -26,6 +26,12 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Function to check if containers are running
 check_status() {
+    # Check if docker compose is able to connect
+    if ! docker-compose ps &>/dev/null; then
+        echo "stopped"
+        return
+    fi
+    
     local running_containers=$(docker-compose ps --services --filter "status=running" 2>/dev/null | wc -l)
     if [ $running_containers -gt 0 ]; then
         echo "running"
@@ -46,11 +52,11 @@ check_xdebug() {
 
 # Function to start all services
 start_services() {
-    echo -e "${YELLOW}Starting KharchaTrack services...${RESET}"
+    echo -e "${YELLOW}Starting maryDock services...${RESET}"
     docker-compose up -d
     sleep 2
     if [ "$(check_status)" == "running" ]; then
-        echo -e "${GREEN}✓ KharchaTrack started successfully!${RESET}"
+        echo -e "${GREEN}✓ maryDock started successfully!${RESET}"
         echo -e "${BLUE}Server is running at: http://localhost:9000${RESET}"
     else
         echo -e "${RED}✗ Failed to start services. Check logs with: docker-compose logs${RESET}"
@@ -60,26 +66,63 @@ start_services() {
 
 # Function to stop all services
 stop_services() {
-    echo -e "${YELLOW}Stopping KharchaTrack services...${RESET}"
+    echo -e "${YELLOW}Stopping maryDock services...${RESET}"
+    
+    # Check for and stop any running Node container first
+    local node_container=$(docker ps -q --filter "name=vite_dev_server" --filter "name=mary-ui-docker-template-node")
+    if [ -n "$node_container" ]; then
+        echo -e "${YELLOW}Stopping Node.js development server...${RESET}"
+        docker stop $node_container
+        docker rm $node_container 2>/dev/null
+    fi
+    
     docker-compose down
+    
+    # Give a moment for network cleanup
     sleep 2
-    if [ "$(check_status)" == "stopped" ]; then
-        echo -e "${GREEN}✓ KharchaTrack stopped successfully!${RESET}"
-    else
+    
+    # Just check if any containers are still running
+    if [ -n "$(docker ps -q --filter "name=laravel_")" ]; then
         echo -e "${RED}✗ Failed to stop services. Try: docker-compose down --remove-orphans${RESET}"
         exit 1
+    else
+        echo -e "${GREEN}✓ maryDock stopped successfully!${RESET}"
+    fi
+}
+
+# Function to stop node development server only
+stop_node() {
+    echo -e "${YELLOW}Stopping Node.js development server...${RESET}"
+    
+    # Check for and stop any running Node container
+    node_container=$(docker ps -q --filter "name=vite_dev_server" --filter "name=mary-ui-docker-template-node")
+    if [ -n "$node_container" ]; then
+        docker stop $node_container
+        docker rm $node_container 2>/dev/null
+        echo -e "${GREEN}✓ Node.js development server stopped.${RESET}"
+    else
+        echo -e "${YELLOW}No running Node.js development server found.${RESET}"
     fi
 }
 
 # Function to restart all services
 restart_services() {
-    echo -e "${YELLOW}Restarting KharchaTrack services...${RESET}"
+    echo -e "${YELLOW}Restarting maryDock services...${RESET}"
+    
+    # Check for and stop any running Node container first
+    local node_container=$(docker ps -q --filter "name=vite_dev_server" --filter "name=mary-ui-docker-template-node")
+    if [ -n "$node_container" ]; then
+        echo -e "${YELLOW}Stopping Node.js development server...${RESET}"
+        docker stop $node_container
+        docker rm $node_container 2>/dev/null
+    fi
+    
     docker-compose down
     sleep 2
     docker-compose up -d
     sleep 2
     if [ "$(check_status)" == "running" ]; then
-        echo -e "${GREEN}✓ KharchaTrack restarted successfully!${RESET}"
+        echo -e "${GREEN}✓ maryDock restarted successfully!${RESET}"
         echo -e "${BLUE}Server is running at: http://localhost:9000${RESET}"
     else
         echo -e "${RED}✗ Failed to restart services. Check logs with: docker-compose logs${RESET}"
@@ -317,12 +360,13 @@ build_assets() {
 
 # Function to show help
 show_help() {
-    echo -e "${BOLD}${BLUE}KharchaTrack Server CLI Runner${RESET}"
+    echo -e "${BOLD}${BLUE}maryDock Server CLI Runner${RESET}"
     echo -e "${YELLOW}Usage: $0 [command] [options]${RESET}"
     echo
     echo -e "${BOLD}Available commands:${RESET}"
     echo -e "  ${GREEN}start${RESET}                Start all services"
     echo -e "  ${GREEN}stop${RESET}                 Stop all services"
+    echo -e "  ${GREEN}stop-node${RESET}            Stop only the Node.js development server"
     echo -e "  ${GREEN}restart${RESET}              Restart all services"
     echo -e "  ${GREEN}status${RESET}               Show status of all containers and resources"
     echo -e "  ${GREEN}logs [service]${RESET}       View logs for a specific service"
@@ -351,6 +395,9 @@ case "$1" in
         ;;
     stop)
         stop_services
+        ;;
+    stop-node)
+        stop_node
         ;;
     restart)
         restart_services

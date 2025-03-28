@@ -1,4 +1,4 @@
-name: KharchaTrack
+name: maryDock
 description: A resource-optimized Laravel expense tracking application designed for low-end hardware
 private: false
 has_issues: true

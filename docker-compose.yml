@@ -34,7 +34,7 @@ services:
       retries: 3
       start_period: 30s
     labels:
-      - "glance.name=KharchaTrack App"
+      - "glance.name=maryDock App"
       - "glance.description=Laravel FrankenPHP Application"
       - "glance.type=application"
       - "glance.priority=high"
@@ -67,7 +67,7 @@ services:
       retries: 5
     labels:
       - "glance.name=PostgreSQL"
-      - "glance.description=KharchaTrack Database"
+      - "glance.description=maryDock Database"
       - "glance.type=database"
       - "glance.priority=critical"
       - "glance.group=data"
@@ -93,7 +93,7 @@ services:
       retries: 5
     labels:
       - "glance.name=Redis"
-      - "glance.description=KharchaTrack Cache & Queue"
+      - "glance.description=maryDock Cache & Queue"
       - "glance.type=cache"
       - "glance.priority=medium"
       - "glance.group=data"
@@ -141,8 +141,8 @@ networks:
   laravel:
     driver: bridge
     labels:
-      - "glance.name=KharchaTrack Network"
-      - "glance.description=Internal network for KharchaTrack containers"
+      - "glance.name=maryDock Network"
+      - "glance.description=Internal network for maryDock containers"
 
 volumes:
   postgres_data:

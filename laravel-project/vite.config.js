@@ -18,7 +18,9 @@ export default defineConfig({
         host: '0.0.0.0',
         port: 5173,
         hmr: {
-            host: 'localhost'
+            host: '192.168.18.153',  // Changed to use specific IP address
+            protocol: 'ws',
+            port: 5173,
         },
     },
 });
