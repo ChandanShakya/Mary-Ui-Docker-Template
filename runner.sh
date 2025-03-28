@@ -42,11 +42,24 @@ check_status() {
 
 # Function to check if Xdebug is enabled
 check_xdebug() {
-    local xdebug_status=$(docker-compose exec -T frankenphp php -i | grep "xdebug.mode" | grep -v "off" 2>/dev/null)
-    if [ -n "$xdebug_status" ]; then
-        echo "enabled"
-    else
+    # Check if container is running first
+    if [ "$(check_status)" != "running" ]; then
         echo "disabled"
+        return
+    fi
+    
+    # Get xdebug mode - properly handle "no value" or empty value cases
+    local xdebug_mode=$(docker-compose exec -T frankenphp php -r 'echo ini_get("xdebug.mode");' 2>/dev/null)
+    
+    # For debug purposes
+    # echo "Raw xdebug mode: '$xdebug_mode'"
+    
+    # Check if mode is empty, "no value", or "off"
+    if [ -z "$xdebug_mode" ] || [ "$xdebug_mode" = "no value" ] || [ "$xdebug_mode" = "off" ]; then
+        echo "disabled"
+    else
+        echo "enabled"
+        echo "$xdebug_mode" > /tmp/xdebug_mode.txt
     fi
 }
 
@@ -143,7 +156,8 @@ show_status() {
         local xdebug_status=$(check_xdebug)
         if [ "$xdebug_status" == "enabled" ]; then
             echo -e "\n${GREEN}Xdebug is enabled${RESET}"
-            local xdebug_mode=$(docker-compose exec -T frankenphp php -i | grep "xdebug.mode" | head -1 | awk -F'=>' '{print $2}' | xargs)
+            # Get the mode directly through PHP to handle edge cases better
+            local xdebug_mode=$(docker-compose exec -T frankenphp php -r 'echo ini_get("xdebug.mode");' 2>/dev/null)
             echo -e "Mode: ${YELLOW}${xdebug_mode}${RESET}"
         else
             echo -e "\n${RED}Xdebug is disabled${RESET}"
@@ -220,20 +234,66 @@ enable_xdebug() {
     
     echo -e "${YELLOW}Enabling Xdebug in $mode mode...${RESET}"
     
-    # Setup for VSCode SSH remote debugging
-    docker-compose exec frankenphp bash -c "echo 'xdebug.mode=$mode' > /usr/local/etc/php/conf.d/xdebug.ini \
-        && echo 'xdebug.start_with_request=trigger' >> /usr/local/etc/php/conf.d/xdebug.ini \
-        && echo 'xdebug.client_host=host.docker.internal' >> /usr/local/etc/php/conf.d/xdebug.ini \
-        && echo 'xdebug.discover_client_host=true' >> /usr/local/etc/php/conf.d/xdebug.ini \
-        && echo 'xdebug.client_port=9003' >> /usr/local/etc/php/conf.d/xdebug.ini \
-        && echo 'xdebug.log=/tmp/xdebug.log' >> /usr/local/etc/php/conf.d/xdebug.ini \
-        && echo 'xdebug.idekey=VSCODE' >> /usr/local/etc/php/conf.d/xdebug.ini"
+    # Get current Xdebug status before changes
+    echo -e "${YELLOW}Checking current Xdebug status...${RESET}"
+    docker-compose exec frankenphp php -v | grep -i xdebug
     
-    restart_services
+    # First, make sure the PHP installation has the necessary packages
+    echo -e "${YELLOW}Ensuring Xdebug is properly installed...${RESET}"
     
-    echo -e "${GREEN}✓ Xdebug has been enabled in $mode mode.${RESET}"
+    # Update both potential Xdebug config files
+    echo -e "${YELLOW}Creating Xdebug configuration in container...${RESET}"
+    
+    # Update the main xdebug.ini file
+    docker-compose exec frankenphp bash -c "echo 'zend_extension=xdebug.so
+xdebug.mode=$mode
+xdebug.start_with_request=trigger
+xdebug.client_host=host.docker.internal
+xdebug.discover_client_host=true
+xdebug.client_port=9003
+xdebug.log=/tmp/xdebug.log
+xdebug.idekey=VSCODE' > /usr/local/etc/php/conf.d/xdebug.ini"
+
+    # Also update the docker-php-ext-xdebug.ini file if it exists
+    docker-compose exec frankenphp bash -c "if [ -f /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini ]; then
+        echo 'zend_extension=xdebug.so
+xdebug.mode=$mode
+xdebug.start_with_request=trigger
+xdebug.client_host=host.docker.internal
+xdebug.discover_client_host=true
+xdebug.client_port=9003
+xdebug.log=/tmp/xdebug.log
+xdebug.idekey=VSCODE' > /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini
+    fi"
+
+    # Use a more effective way to restart PHP processes
+    echo -e "${YELLOW}Restarting PHP to apply Xdebug settings...${RESET}"
+    docker-compose restart frankenphp
+    sleep 3
+    
+    # Verify that Xdebug is enabled with the correct mode
+    local xdebug_mode=$(docker-compose exec -T frankenphp php -r 'echo ini_get("xdebug.mode");' 2>/dev/null)
+    echo -e "${YELLOW}Detected Xdebug mode: $xdebug_mode${RESET}"
+    
+    if [[ "$xdebug_mode" == *"$mode"* ]]; then
+        echo -e "${GREEN}✓ Xdebug has been successfully enabled in $mode mode.${RESET}"
+    else
+        echo -e "${RED}✗ Failed to enable Xdebug in $mode mode. Current mode: $xdebug_mode${RESET}"
+        echo -e "${YELLOW}Trying to debug the issue...${RESET}"
+        docker-compose exec frankenphp bash -c "php -v | grep -i xdebug || echo 'Xdebug not showing in PHP version'"
+        docker-compose exec frankenphp bash -c "ls -la /usr/local/etc/php/conf.d/ | grep xdebug"
+        docker-compose exec frankenphp bash -c "cat /usr/local/etc/php/conf.d/xdebug.ini"
+        [ -n "$(docker-compose exec -T frankenphp bash -c "ls -la /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini 2>/dev/null")" ] && \
+            docker-compose exec frankenphp bash -c "cat /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini"
+        echo -e "${YELLOW}=== PHP Modules ===${RESET}"
+        docker-compose exec frankenphp bash -c "php -m | grep -i xdebug"
+        echo -e "${YELLOW}=== Xdebug Info ===${RESET}"
+        docker-compose exec frankenphp php -i | grep -i xdebug
+    fi
+    
     echo -e "${YELLOW}To trigger debugging:${RESET}"
     echo "  1. Use XDEBUG_TRIGGER query parameter in URLs"
+    echo "    Example: http://localhost:9000/?XDEBUG_TRIGGER"
     echo "  2. Set XDEBUG_TRIGGER cookie"
     echo "  3. Set XDEBUG_TRIGGER environment variable"
     echo
@@ -251,11 +311,25 @@ disable_xdebug() {
     fi
     
     echo -e "${YELLOW}Disabling Xdebug...${RESET}"
-    docker-compose exec frankenphp bash -c "echo 'xdebug.mode=off' > /usr/local/etc/php/conf.d/xdebug.ini"
     
-    restart_services
+    # Create Xdebug INI file directly in the app container that disables Xdebug
+    echo -e "${YELLOW}Creating Xdebug configuration in container...${RESET}"
+    docker-compose exec frankenphp bash -c "echo 'zend_extension=xdebug.so
+xdebug.mode=off' > /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini"
     
-    echo -e "${GREEN}✓ Xdebug has been disabled. This improves application performance.${RESET}"
+    # Restart PHP FPM to apply the configuration
+    echo -e "${YELLOW}Restarting PHP to apply Xdebug settings...${RESET}"
+    docker-compose exec frankenphp bash -c "kill -USR2 \$(ps -o pid= -C php-fpm) 2>/dev/null || killall -USR2 php-fpm 2>/dev/null || echo 'PHP-FPM not running, trying Octane'"
+    docker-compose exec frankenphp bash -c "kill -USR2 \$(ps -o pid= -C php) 2>/dev/null || echo 'No PHP processes found'"
+    sleep 2
+    
+    # Verify that Xdebug is disabled
+    local xdebug_mode=$(docker-compose exec -T frankenphp php -r 'echo ini_get("xdebug.mode");' 2>/dev/null)
+    if [ "$xdebug_mode" == "off" ] || [ -z "$xdebug_mode" ] || [ "$xdebug_mode" == "no value" ]; then
+        echo -e "${GREEN}✓ Xdebug has been disabled. This improves application performance.${RESET}"
+    else
+        echo -e "${RED}✗ Failed to disable Xdebug. Current mode: $xdebug_mode${RESET}"
+    fi
 }
 
 # Function to connect to PostgreSQL
